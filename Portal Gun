@@ -1,0 +1,240 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local Debris = game:GetService("Debris")
+
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+
+local Config = {
+	ToolName = "Portal Gun",
+	PortalSize = Vector3.new(4, 6, 0.2), 
+	PrimaryColor = Color3.fromRGB(0, 170, 255),   
+	SecondaryColor = Color3.fromRGB(255, 140, 0), 
+	MaxRange = 800,
+	TeleportCooldown = 0.5,
+	ExitDistance = 3, 
+	ExitVelocity = 35, 
+	EnableTracers = true,
+	EnableParticles = true,
+}
+
+local Tool = Instance.new("Tool")
+Tool.Name = Config.ToolName
+Tool.RequiresHandle = true 
+Tool.Parent = Player:WaitForChild("Backpack")
+local function buildToolModel()
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(0.4, 1.2, 0.6)
+	handle.Color = Color3.fromRGB(30, 30, 30)
+	handle.Material = Enum.Material.Metal
+	handle.CanCollide = false
+	handle.Parent = Tool
+
+	local barrel = Instance.new("Part")
+	local barrelLength = 1.6
+	barrel.Name = "Barrel"
+	barrel.Size = Vector3.new(0.5, 0.5, barrelLength)
+	barrel.Color = Color3.fromRGB(200, 200, 200)
+	barrel.Material = Enum.Material.Metal
+	barrel.CanCollide = false
+	barrel.CFrame = handle.CFrame * CFrame.new(0, 0.6, -barrelLength/2 + 0.2)
+	barrel.Parent = Tool
+
+	local core = Instance.new("Part")
+	core.Name = "Core"
+	core.Shape = Enum.PartType.Ball
+	core.Size = Vector3.new(0.6, 0.6, 0.6)
+	core.Color = Color3.fromRGB(255, 255, 255) 
+	core.Material = Enum.Material.Neon
+	core.CanCollide = false
+	core.CFrame = barrel.CFrame * CFrame.new(0, 0, 0)
+	core.Parent = Tool
+
+	local weld1 = Instance.new("WeldConstraint")
+	weld1.Part0 = handle
+	weld1.Part1 = barrel
+	weld1.Parent = handle
+
+	local weld2 = Instance.new("WeldConstraint")
+	weld2.Part0 = barrel
+	weld2.Part1 = core
+	weld2.Parent = barrel
+end
+
+buildToolModel() 
+
+local Portals = { Primary = nil, Secondary = nil }
+local Equipped = false
+local TeleportDebounce = false
+
+local function applyVisualEffects(core, color)
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = 10
+	light.Brightness = 2
+	light.Parent = core
+
+	if Config.EnableParticles then
+		local particles = Instance.new("ParticleEmitter")
+		particles.Color = ColorSequence.new(color)
+		particles.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(1, 0)
+		})
+		particles.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.2),
+			NumberSequenceKeypoint.new(1, 1)
+		})
+		particles.Texture = "rbxassetid://284205403"
+		particles.EmissionDirection = Enum.NormalId.Front
+		particles.Lifetime = NumberRange.new(0.5, 0.8)
+		particles.Rate = 20
+		particles.Speed = NumberRange.new(1, 4)
+		particles.Shape = Enum.ParticleEmitterShape.Cylinder
+		particles.Parent = core
+	end
+end
+
+local function createTracer(origin, target, color)
+	if not Config.EnableTracers then return end
+	
+	local distance = (origin - target).Magnitude
+	local tracer = Instance.new("Part")
+	tracer.Anchored = true
+	tracer.CanCollide = false
+	tracer.Material = Enum.Material.Neon
+	tracer.Color = color
+	tracer.Size = Vector3.new(0.1, 0.1, distance)
+	tracer.CFrame = CFrame.lookAt(origin, target) * CFrame.new(0, 0, -distance / 2)
+	tracer.Parent = workspace
+	
+	Debris:AddItem(tracer, 0.05) 
+end
+
+local function createPortal(pos, normal, color)
+	local hitbox = Instance.new("Part")
+	hitbox.Anchored = true
+	hitbox.CanCollide = false
+	hitbox.Transparency = 1
+	hitbox.Size = Config.PortalSize
+	hitbox.CFrame = CFrame.lookAt(pos, pos + normal)
+	hitbox.Parent = workspace
+
+	local core = Instance.new("Part")
+	core.Shape = Enum.PartType.Cylinder
+	core.Material = Enum.Material.Neon
+	core.Color = color
+	core.CanCollide = false
+	core.Anchored = true
+	core.Size = Vector3.new(0.1, Config.PortalSize.Y, Config.PortalSize.X)
+	core.CFrame = hitbox.CFrame * CFrame.Angles(0, math.rad(90), 0)
+	core.Parent = hitbox
+
+	local ring = core:Clone()
+	ring.Material = Enum.Material.Glass
+	ring.Color = Color3.fromRGB(20, 20, 20)
+	ring.Size = Vector3.new(0.05, Config.PortalSize.Y + 0.6, Config.PortalSize.X + 0.6)
+	ring.CFrame = core.CFrame * CFrame.new(0.02, 0, 0) 
+	ring.Parent = hitbox
+	
+	for _, child in pairs(ring:GetChildren()) do child:Destroy() end
+
+	applyVisualEffects(core, color)
+
+	return hitbox
+end
+
+local function teleport(destination)
+	if not destination or TeleportDebounce then return end
+
+	local character = Player.Character
+	if not character then return end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character:FindFirstChild("Humanoid")
+	if not root or not humanoid then return end
+
+	TeleportDebounce = true
+
+	local exitNormal = destination.CFrame.LookVector
+	local spawnPos = destination.CFrame.Position + (exitNormal * Config.ExitDistance)
+	
+	if exitNormal.Y > 0.5 then
+		spawnPos = spawnPos + Vector3.new(0, (humanoid.HipHeight or 2) + 1, 0)
+	end
+
+	local lookDir = exitNormal
+	if math.abs(lookDir.Y) > 0.9 then 
+		lookDir = destination.CFrame.UpVector 
+	end
+	lookDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit 
+	
+	local targetCFrame = CFrame.lookAt(spawnPos, spawnPos + lookDir)
+
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
+
+	character:PivotTo(targetCFrame)
+	root.AssemblyLinearVelocity = exitNormal * Config.ExitVelocity
+
+	task.wait(Config.TeleportCooldown)
+	TeleportDebounce = false
+end
+
+local function setupPortalLogic(portal, getDestination)
+	portal.Touched:Connect(function(hit)
+		local character = Player.Character
+		if character and hit:IsDescendantOf(character) then
+			teleport(getDestination())
+		end
+	end)
+end
+
+local function firePortal(isPrimary)
+	local unitRay = Mouse.UnitRay
+	local barrel = Tool:FindFirstChild("Barrel")
+	local core = Tool:FindFirstChild("Core")
+	
+	local fireOrigin = barrel and barrel.Position or (Player.Character and Player.Character.Head.Position)
+	if not fireOrigin then return end
+
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {Player.Character, Portals.Primary, Portals.Secondary, Tool}
+	params.FilterType = Enum.RaycastFilterType.Exclude
+
+	local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * Config.MaxRange, params)
+
+	if not result then return end
+
+	local pos = result.Position + result.Normal * 0.05 
+	local color = isPrimary and Config.PrimaryColor or Config.SecondaryColor
+
+	if core then core.Color = color end
+
+	createTracer(fireOrigin, pos, color)
+
+	if isPrimary then
+		if Portals.Primary then Portals.Primary:Destroy() end
+		Portals.Primary = createPortal(pos, result.Normal, color)
+		setupPortalLogic(Portals.Primary, function() return Portals.Secondary end)
+	else
+		if Portals.Secondary then Portals.Secondary:Destroy() end
+		Portals.Secondary = createPortal(pos, result.Normal, color)
+		setupPortalLogic(Portals.Secondary, function() return Portals.Primary end)
+	end
+end
+
+Tool.Equipped:Connect(function() Equipped = true end)
+Tool.Unequipped:Connect(function() Equipped = false end)
+Tool.Activated:Connect(function()
+	if Equipped then firePortal(true) end
+end)
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed or not Equipped then return end
+
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		firePortal(false)
+	end
+end)
