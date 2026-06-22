@@ -1,10 +1,6 @@
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 
--- ==========================================
--- ||          R-GUI LIBRARY CORE          ||
--- ==========================================
 local RGui = {}
 
 -- Theme Colors
@@ -12,11 +8,12 @@ local Theme = {
 	MainBlue = Color3.fromRGB(41, 74, 122),
 	Background = Color3.fromRGB(21, 22, 23),
 	TextColor = Color3.fromRGB(255, 255, 255),
-	Font = Enum.Font.Code -- Changed to Code for a cleaner, modern look
+	Font = Enum.Font.Code
 }
 
 function RGui:CreateWindow(titleText)
 	local WindowData = {}
+	local LocalPlayer = Players.LocalPlayer
 	
 	-- Main ScreenGui
 	local ScreenGui = Instance.new("ScreenGui")
@@ -57,7 +54,7 @@ function RGui:CreateWindow(titleText)
 	Title.TextSize = 16
 	Title.Parent = HeaderFrame
 	
-	-- Close Button (Visual only for now, based on your image)
+	-- Close Button
 	local CloseBtn = Instance.new("TextButton")
 	CloseBtn.Size = UDim2.new(0, 20, 0, 20)
 	CloseBtn.Position = UDim2.new(1, -25, 0.5, -10)
@@ -90,11 +87,11 @@ function RGui:CreateWindow(titleText)
 	ResizeIcon.Size = UDim2.new(0, 15, 0, 15)
 	ResizeIcon.Position = UDim2.new(1, -15, 1, -15)
 	ResizeIcon.BackgroundTransparency = 1
-	ResizeIcon.Image = "rbxassetid://10709769598" -- Your corner icon
+	ResizeIcon.Image = "rbxassetid://10709769598"
 	ResizeIcon.ImageColor3 = Theme.MainBlue
 	ResizeIcon.Parent = BodyFrame
 
-	-- Container for elements (Uses UIListLayout for automatic stacking)
+	-- Container for elements
 	local Container = Instance.new("Frame")
 	Container.Name = "Container"
 	Container.Size = UDim2.new(1, -20, 1, -20)
@@ -107,7 +104,7 @@ function RGui:CreateWindow(titleText)
 	UIListLayout.Padding = UDim.new(0, 15)
 	UIListLayout.Parent = Container
 	
-	-- Simple Window Dragging Logic
+	-- Window Dragging Logic
 	local dragging, dragInput, dragStart, startPos
 	HeaderFrame.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -177,7 +174,7 @@ function RGui:CreateWindow(titleText)
 		local Box = Instance.new("TextButton")
 		Box.Size = UDim2.new(0, 25, 0, 25)
 		Box.BackgroundColor3 = Theme.Background
-		Box.BorderColor3 = Color3.fromRGB(80, 80, 80) -- Subtle border
+		Box.BorderColor3 = Color3.fromRGB(80, 80, 80)
 		Box.BorderSizePixel = 1
 		Box.Text = toggled and "✓" or ""
 		Box.TextColor3 = Theme.TextColor
@@ -208,7 +205,6 @@ function RGui:CreateWindow(titleText)
 		Element.BackgroundTransparency = 1
 		Element.Parent = Container
 		
-		-- Background Line
 		local Line = Instance.new("Frame")
 		Line.Size = UDim2.new(1, -10, 0, 4)
 		Line.Position = UDim2.new(0, 5, 0, 10)
@@ -216,7 +212,6 @@ function RGui:CreateWindow(titleText)
 		Line.BorderSizePixel = 0
 		Line.Parent = Element
 		
-		-- Dragger Nub
 		local Nub = Instance.new("TextButton")
 		Nub.Size = UDim2.new(0, 10, 0, 20)
 		Nub.Position = UDim2.new(0.1, -5, 0.5, -10)
@@ -236,7 +231,6 @@ function RGui:CreateWindow(titleText)
 		Label.TextSize = 14
 		Label.Parent = Element
 		
-		-- Basic Slider Math & Logic
 		local draggingSlider = false
 		Nub.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = true end
@@ -269,7 +263,7 @@ function RGui:CreateWindow(titleText)
 		Label.Parent = Container
 		
 		if isColored then
-			Label.TextColor3 = Color3.fromRGB(255, 0, 4) -- The Red from your image
+			Label.TextColor3 = Color3.fromRGB(255, 0, 4)
 		else
 			Label.TextColor3 = Theme.TextColor
 		end
@@ -277,3 +271,5 @@ function RGui:CreateWindow(titleText)
 
 	return WindowData
 end
+
+return RGui
