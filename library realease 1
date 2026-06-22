@@ -1,0 +1,466 @@
+--[[
+    ██████╗       ██████╗ ██╗   ██╗██╗
+    ██╔══██╗      ██╔════╝ ██║   ██║██║
+    ██████╔╝█████╗██║  ███╗██║   ██║██║
+    ██╔══██╗╚════╝██║   ██║██║   ██║██║
+    ██║  ██║      ╚██████╔╝╚██████╔╝██║
+    ╚═╝  ╚═╝       ╚═════╝  ╚═════╝ ╚═╝
+    R-GUI Library v1.0
+    A clean Roblox GUI library with reusable components.
+
+    Components:
+        Window:AddButton(text, callback)
+        Window:AddCheckbox(text, default, callback)
+        Window:AddSlider(text, min, max, default, callback)
+        Window:AddLabel(text, color)
+        Window:AddSection(text)
+        Window:AddSeparator()
+
+    Usage:
+        local RGui = require(path.to.RGui)
+        local win  = RGui.new("My Window")
+        win:AddButton("Click me!", function() print("clicked") end)
+        win:AddCheckbox("Enable feature", false, function(v) print(v) end)
+        win:AddSlider("Speed", 0, 100, 50, function(v) print(v) end)
+        win:AddLabel("Info text")
+        win:AddLabel("Warning!", Color3.fromRGB(255, 0, 4))
+]]--
+
+local RGui = {}
+RGui.__index = RGui
+
+-- ── Services ──────────────────────────────────────────────────────────────────
+local Players           = game:GetService("Players")
+local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ── Theme ─────────────────────────────────────────────────────────────────────
+local Theme = {
+    Background    = Color3.fromRGB(21,  22,  23),
+    TitleBar      = Color3.fromRGB(41,  74,  122),
+    Accent        = Color3.fromRGB(56,  101, 165),
+    Text          = Color3.fromRGB(255, 255, 255),
+    SubText       = Color3.fromRGB(180, 180, 180),
+    Button        = Color3.fromRGB(41,  74,  122),
+    ButtonHover   = Color3.fromRGB(56,  101, 165),
+    CheckboxOff   = Color3.fromRGB(21,  22,  23),
+    CheckboxOn    = Color3.fromRGB(56,  101, 165),
+    SliderTrack   = Color3.fromRGB(21,  22,  23),
+    SliderFill    = Color3.fromRGB(56,  101, 165),
+    SliderHandle  = Color3.fromRGB(41,  74,  122),
+    Separator     = Color3.fromRGB(41,  74,  122),
+    Section       = Color3.fromRGB(56,  101, 165),
+}
+
+local TWEEN_FAST = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
+
+-- ── Internal Helpers ──────────────────────────────────────────────────────────
+
+local function applyCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 3)
+    c.Parent = parent
+    return c
+end
+
+local function applyPadding(parent, px)
+    local p = Instance.new("UIPadding")
+    p.PaddingLeft   = UDim.new(0, px)
+    p.PaddingRight  = UDim.new(0, px)
+    p.PaddingTop    = UDim.new(0, px)
+    p.PaddingBottom = UDim.new(0, px)
+    p.Parent = parent
+    return p
+end
+
+local function makeDraggable(frame, handle)
+    local dragging  = false
+    local dragInput
+    local dragStart
+    local startPos
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging   = true
+            dragStart  = input.Position
+            startPos   = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- ── RGui.new(title) ───────────────────────────────────────────────────────────
+--   Creates and returns a new GUI window.
+function RGui.new(title)
+    local self = setmetatable({}, RGui)
+    title = title or "R-GUI"
+
+    -- ScreenGui
+    local screen = Instance.new("ScreenGui")
+    screen.Name           = "RGui_" .. title
+    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screen.ResetOnSpawn   = false
+    screen.Parent         = PlayerGui
+
+    -- Title bar (thin strip that also acts as the drag handle)
+    local titleBar = Instance.new("Frame")
+    titleBar.Name            = "TitleBar"
+    titleBar.BackgroundColor3 = Theme.TitleBar
+    titleBar.BorderSizePixel  = 0
+    titleBar.Position         = UDim2.new(0.5, -116, 0.3, 0)
+    titleBar.Size             = UDim2.new(0, 233, 0, 24)
+    titleBar.Parent           = screen
+    applyCorner(titleBar, 4)
+
+    -- Title text
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Name               = "Title"
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Position           = UDim2.new(0, 8, 0, 0)
+    titleLbl.Size               = UDim2.new(1, -36, 1, 0)
+    titleLbl.ZIndex             = 3
+    titleLbl.Font               = Enum.Font.GothamBold
+    titleLbl.Text               = title
+    titleLbl.TextColor3         = Theme.Text
+    titleLbl.TextSize           = 14
+    titleLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    titleLbl.Parent             = titleBar
+
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name               = "CloseBtn"
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.AnchorPoint        = Vector2.new(1, 0.5)
+    closeBtn.Position           = UDim2.new(1, -6, 0.5, 0)
+    closeBtn.Size               = UDim2.new(0, 20, 0, 20)
+    closeBtn.ZIndex             = 4
+    closeBtn.Font               = Enum.Font.GothamBold
+    closeBtn.Text               = "×"
+    closeBtn.TextColor3         = Theme.Text
+    closeBtn.TextSize           = 20
+    closeBtn.Parent             = titleBar
+
+    closeBtn.MouseButton1Click:Connect(function()
+        screen:Destroy()
+    end)
+
+    -- Content frame (dark body)
+    local body = Instance.new("Frame")
+    body.Name               = "Body"
+    body.BackgroundColor3   = Theme.Background
+    body.BorderSizePixel    = 0
+    body.Position           = UDim2.new(0, 0, 1, 0)   -- directly below title bar
+    body.Size               = UDim2.new(0, 233, 0, 10) -- grows with content
+    body.ZIndex             = 1
+    body.ClipsDescendants   = false
+    body.Parent             = titleBar
+    applyCorner(body, 4)
+    applyPadding(body, 8)
+
+    -- List layout
+    local list = Instance.new("UIListLayout")
+    list.SortOrder   = Enum.SortOrder.LayoutOrder
+    list.Padding     = UDim.new(0, 8)
+    list.Parent      = body
+
+    -- Auto-resize body as items are added
+    list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        body.Size = UDim2.new(0, 233, 0, list.AbsoluteContentSize.Y + 16)
+    end)
+
+    -- Make window draggable by title bar
+    makeDraggable(titleBar, titleBar)
+
+    self._screen      = screen
+    self._titleBar    = titleBar
+    self._body        = body
+    self._layoutOrder = 0
+
+    return self
+end
+
+-- ── Helper: next layout order ─────────────────────────────────────────────────
+function RGui:_nextOrder()
+    local o = self._layoutOrder
+    self._layoutOrder = o + 1
+    return o
+end
+
+-- ── Window:AddButton(text, callback) ─────────────────────────────────────────
+function RGui:AddButton(text, callback)
+    local row = Instance.new("Frame")
+    row.BackgroundTransparency = 1
+    row.Size        = UDim2.new(1, 0, 0, 28)
+    row.LayoutOrder = self:_nextOrder()
+    row.Parent      = self._body
+
+    -- The actual button
+    local btn = Instance.new("TextButton")
+    btn.BackgroundColor3 = Theme.Button
+    btn.BorderSizePixel  = 0
+    btn.Size             = UDim2.new(0, 74, 1, 0)
+    btn.Font             = Enum.Font.GothamBold
+    btn.Text             = "Button"
+    btn.TextColor3       = Theme.Text
+    btn.TextSize         = 13
+    btn.Parent           = row
+    applyCorner(btn, 3)
+
+    -- Label next to button
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Position           = UDim2.new(0, 82, 0, 0)
+    lbl.Size               = UDim2.new(1, -82, 1, 0)
+    lbl.Font               = Enum.Font.Gotham
+    lbl.Text               = text
+    lbl.TextColor3         = Theme.Text
+    lbl.TextSize           = 14
+    lbl.TextXAlignment     = Enum.TextXAlignment.Left
+    lbl.Parent             = row
+
+    -- Hover / press tweens
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TWEEN_FAST, {BackgroundColor3 = Theme.ButtonHover}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TWEEN_FAST, {BackgroundColor3 = Theme.Button}):Play()
+    end)
+
+    if callback then
+        btn.MouseButton1Click:Connect(callback)
+    end
+
+    return btn
+end
+
+-- ── Window:AddCheckbox(text, default, callback) ───────────────────────────────
+function RGui:AddCheckbox(text, default, callback)
+    local checked = default == true
+
+    local row = Instance.new("Frame")
+    row.BackgroundTransparency = 1
+    row.Size        = UDim2.new(1, 0, 0, 26)
+    row.LayoutOrder = self:_nextOrder()
+    row.Parent      = self._body
+
+    local box = Instance.new("TextButton")
+    box.BackgroundColor3 = checked and Theme.CheckboxOn or Theme.CheckboxOff
+    box.BorderSizePixel  = 0
+    box.Size             = UDim2.new(0, 22, 0, 22)
+    box.Font             = Enum.Font.GothamBold
+    box.Text             = checked and "✓" or ""
+    box.TextColor3       = Theme.Text
+    box.TextSize         = 13
+    box.Parent           = row
+    applyCorner(box, 3)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Position           = UDim2.new(0, 30, 0, 0)
+    lbl.Size               = UDim2.new(1, -30, 1, 0)
+    lbl.Font               = Enum.Font.Gotham
+    lbl.Text               = text
+    lbl.TextColor3         = Theme.Text
+    lbl.TextSize           = 14
+    lbl.TextXAlignment     = Enum.TextXAlignment.Left
+    lbl.Parent             = row
+
+    box.MouseButton1Click:Connect(function()
+        checked = not checked
+        box.Text = checked and "✓" or ""
+        TweenService:Create(box, TWEEN_FAST, {
+            BackgroundColor3 = checked and Theme.CheckboxOn or Theme.CheckboxOff
+        }):Play()
+        if callback then callback(checked) end
+    end)
+
+    return {
+        GetValue = function() return checked end,
+        SetValue = function(v)
+            checked  = v == true
+            box.Text = checked and "✓" or ""
+            box.BackgroundColor3 = checked and Theme.CheckboxOn or Theme.CheckboxOff
+        end,
+    }
+end
+
+-- ── Window:AddSlider(text, min, max, default, callback) ───────────────────────
+function RGui:AddSlider(text, min, max, default, callback)
+    min     = min     or 0
+    max     = max     or 100
+    default = math.clamp(default or min, min, max)
+
+    local value = default
+
+    local container = Instance.new("Frame")
+    container.BackgroundTransparency = 1
+    container.Size        = UDim2.new(1, 0, 0, 46)
+    container.LayoutOrder = self:_nextOrder()
+    container.Parent      = self._body
+
+    -- Label row
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Size              = UDim2.new(1, 0, 0, 18)
+    lbl.Font              = Enum.Font.Gotham
+    lbl.Text              = text .. ":  " .. tostring(value)
+    lbl.TextColor3        = Theme.Text
+    lbl.TextSize          = 14
+    lbl.TextXAlignment    = Enum.TextXAlignment.Left
+    lbl.Parent            = container
+
+    -- Track
+    local track = Instance.new("Frame")
+    track.BackgroundColor3 = Theme.SliderTrack
+    track.BorderSizePixel  = 0
+    track.Position         = UDim2.new(0, 0, 0, 26)
+    track.Size             = UDim2.new(1, 0, 0, 4)
+    track.ZIndex           = 1
+    track.Parent           = container
+    applyCorner(track, 2)
+
+    -- Fill
+    local fill = Instance.new("Frame")
+    fill.BackgroundColor3 = Theme.SliderFill
+    fill.BorderSizePixel  = 0
+    fill.Size             = UDim2.new((value - min) / (max - min), 0, 1, 0)
+    fill.ZIndex           = 2
+    fill.Parent           = track
+    applyCorner(fill, 2)
+
+    -- Handle
+    local handle = Instance.new("TextButton")
+    handle.AnchorPoint        = Vector2.new(0.5, 0.5)
+    handle.BackgroundColor3   = Theme.SliderHandle
+    handle.BorderSizePixel    = 0
+    handle.Position           = UDim2.new((value - min) / (max - min), 0, 0.5, 0)
+    handle.Size               = UDim2.new(0, 10, 0, 20)
+    handle.Text               = ""
+    handle.ZIndex             = 3
+    handle.Parent             = track
+    applyCorner(handle, 3)
+
+    -- Drag logic
+    local function setFromX(absX)
+        local rel = math.clamp(
+            (absX - track.AbsolutePosition.X) / track.AbsoluteSize.X,
+            0, 1
+        )
+        value = math.floor(min + (max - min) * rel + 0.5)
+        lbl.Text        = text .. ":  " .. tostring(value)
+        handle.Position = UDim2.new(rel, 0, 0.5, 0)
+        fill.Size       = UDim2.new(rel, 0, 1, 0)
+        if callback then callback(value) end
+    end
+
+    local dragging = false
+
+    handle.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and (
+            i.UserInputType == Enum.UserInputType.MouseMovement or
+            i.UserInputType == Enum.UserInputType.Touch
+        ) then
+            setFromX(i.Position.X)
+        end
+    end)
+    track.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            setFromX(i.Position.X)
+        end
+    end)
+
+    return {
+        GetValue = function() return value end,
+        SetValue = function(v)
+            v = math.clamp(v, min, max)
+            setFromX(track.AbsolutePosition.X + track.AbsoluteSize.X * ((v - min) / (max - min)))
+        end,
+    }
+end
+
+-- ── Window:AddLabel(text, color?) ─────────────────────────────────────────────
+function RGui:AddLabel(text, color)
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Size              = UDim2.new(1, 0, 0, 22)
+    lbl.LayoutOrder       = self:_nextOrder()
+    lbl.Font              = Enum.Font.Gotham
+    lbl.Text              = text
+    lbl.TextColor3        = color or Theme.Text
+    lbl.TextSize          = 14
+    lbl.TextXAlignment    = Enum.TextXAlignment.Left
+    lbl.TextWrapped       = true
+    lbl.Parent            = self._body
+    return lbl
+end
+
+-- ── Window:AddSection(text) ───────────────────────────────────────────────────
+--   Adds a bold section header in accent colour, useful for grouping elements.
+function RGui:AddSection(text)
+    local lbl = Instance.new("TextLabel")
+    lbl.BackgroundTransparency = 1
+    lbl.Size              = UDim2.new(1, 0, 0, 20)
+    lbl.LayoutOrder       = self:_nextOrder()
+    lbl.Font              = Enum.Font.GothamBold
+    lbl.Text              = "── " .. text
+    lbl.TextColor3        = Theme.Section
+    lbl.TextSize          = 13
+    lbl.TextXAlignment    = Enum.TextXAlignment.Left
+    lbl.Parent            = self._body
+    return lbl
+end
+
+-- ── Window:AddSeparator() ─────────────────────────────────────────────────────
+function RGui:AddSeparator()
+    local sep = Instance.new("Frame")
+    sep.BackgroundColor3 = Theme.Separator
+    sep.BorderSizePixel  = 0
+    sep.Size             = UDim2.new(1, 0, 0, 1)
+    sep.LayoutOrder      = self:_nextOrder()
+    sep.Parent           = self._body
+    return sep
+end
+
+-- ── Window:Destroy() ─────────────────────────────────────────────────────────
+function RGui:Destroy()
+    self._screen:Destroy()
+end
+
+return RGui
