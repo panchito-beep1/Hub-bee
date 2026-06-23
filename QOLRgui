@@ -766,7 +766,6 @@ end
 -- ── NEW: Multi‑Select Dropdown ────────────────────────────────────────────────
 function TabComponent:AddMultiSelectDropdown(text, options, defaults, callback)
     local theme = getTheme(self)
-    -- defaults is a table of values, e.g. {"Easy", "Hard"}
     local selected = {}
     if defaults then
         for _, v in ipairs(defaults) do
@@ -782,18 +781,7 @@ function TabComponent:AddMultiSelectDropdown(text, options, defaults, callback)
     container.ClipsDescendants = true
     container.Parent = self._page
 
-    local function updateHeader()
-        local count = 0
-        for _ in pairs(selected) do count = count + 1 end
-        if count == 0 then
-            header.Text = string.format(" %s: None", text)
-        elseif count == #options then
-            header.Text = string.format(" %s: All", text)
-        else
-            header.Text = string.format(" %s: %d selected", text, count)
-        end
-    end
-
+    -- Define header FIRST
     local header = Instance.new("TextButton")
     header.BackgroundColor3 = theme.FrameBg
     header.Size = UDim2.new(1, 0, 0, 24)
@@ -805,7 +793,19 @@ function TabComponent:AddMultiSelectDropdown(text, options, defaults, callback)
     applyCorner(header, 2)
     applyBorder(header, theme.Border)
 
-    updateHeader()
+    -- Now define updateHeader (after header exists)
+    local function updateHeader()
+        local count = 0
+        for _ in pairs(selected) do count = count + 1 end
+        if count == 0 then
+            header.Text = string.format(" %s: None", text)
+        elseif count == #options then
+            header.Text = string.format(" %s: All", text)
+        else
+            header.Text = string.format(" %s: %d selected", text, count)
+        end
+    end
+    updateHeader()   -- set initial text
 
     local listFrame = Instance.new("Frame")
     listFrame.BackgroundColor3 = theme.TabNormal
@@ -906,9 +906,7 @@ function TabComponent:AddMultiSelectDropdown(text, options, defaults, callback)
     local function openClose()
         isOpen = not isOpen
         if isOpen then
-            -- Height: header + 48 (buttons) + #options*optionHeight
             local totalHeight = 48 + #options * optionHeight
-            -- Constrain to max 180px
             local displayedHeight = math.min(totalHeight, 180)
             scroll.Size = UDim2.new(1, 0, 0, displayedHeight)
             TweenService:Create(container, TWEEN_FAST, {Size = UDim2.new(1, 0, 0, 26 + 2 + displayedHeight)}):Play()
@@ -961,6 +959,19 @@ function TabComponent:AddMultiSelectSearchableDropdown(text, options, defaults, 
     container.ClipsDescendants = true
     container.Parent = self._page
 
+    -- Define header FIRST
+    local header = Instance.new("TextButton")
+    header.BackgroundColor3 = theme.FrameBg
+    header.Size = UDim2.new(1, 0, 0, 24)
+    header.Font = Enum.Font.RobotoMono
+    header.TextColor3 = theme.Text
+    header.TextSize = 13
+    header.TextXAlignment = Enum.TextXAlignment.Left
+    header.Parent = container
+    applyCorner(header, 2)
+    applyBorder(header, theme.Border)
+
+    -- Now define updateHeader (after header exists)
     local function updateHeader()
         local count = 0
         for _ in pairs(selected) do count = count + 1 end
@@ -972,18 +983,7 @@ function TabComponent:AddMultiSelectSearchableDropdown(text, options, defaults, 
             header.Text = string.format(" %s: %d selected", text, count)
         end
     end
-
-    local header = Instance.new("TextButton")
-    header.BackgroundColor3 = theme.FrameBg
-    header.Size = UDim2.new(1, 0, 0, 24)
-    header.Font = Enum.Font.RobotoMono
-    header.TextColor3 = theme.Text
-    header.TextSize = 13
-    header.TextXAlignment = Enum.TextXAlignment.Left
-    header.Parent = container
-    applyCorner(header, 2)
-    applyBorder(header, theme.Border)
-    updateHeader()
+    updateHeader()   -- set initial text
 
     local listFrame = Instance.new("Frame")
     listFrame.BackgroundColor3 = theme.TabNormal
@@ -1011,7 +1011,7 @@ function TabComponent:AddMultiSelectSearchableDropdown(text, options, defaults, 
     -- Scrolling area for options
     local scroll = Instance.new("ScrollingFrame")
     scroll.BackgroundTransparency = 1
-    scroll.Size = UDim2.new(1, 0, 0, 0) -- will be set dynamically
+    scroll.Size = UDim2.new(1, 0, 0, 0)
     scroll.Position = UDim2.new(0, 0, 0, 30)
     scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     scroll.ScrollBarThickness = 4
@@ -1065,6 +1065,38 @@ function TabComponent:AddMultiSelectSearchableDropdown(text, options, defaults, 
         end)
         optionButtons[opt] = {btn = btn, check = checkIndicator}
     end
+
+    local function filterAndResize()
+        local q = searchBox.Text:lower()
+        local visibleCount = 0
+        for _, opt in ipairs(options) do
+            local btnData = optionButtons[opt]
+            local match = (q == "" or opt:lower():find(q, 1, true))
+            btnData.btn.Visible = match
+            if match then visibleCount = visibleCount + 1 end
+        end
+        local totalOptionHeight = visibleCount * 22
+        scroll.CanvasSize = UDim2.new(0, 0, 0, totalOptionHeight)
+        if isOpen then
+            local listHeight = 30 + math.min(totalOptionHeight, 150)
+            scroll.Size = UDim2.new(1, 0, 0, math.min(totalOptionHeight, 150))
+            TweenService:Create(container, TWEEN_FAST, {Size = UDim2.new(1, 0, 0, 26 + listHeight)}):Play()
+            TweenService:Create(listFrame, TWEEN_FAST, {Size = UDim2.new(1, 0, 0, listHeight)}):Play()
+        end
+    end
+
+    searchBox:GetPropertyChangedSignal("Text"):Connect(filterAndResize)
+
+    header.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        if isOpen then
+            filterAndResize()
+        else
+            TweenService:Create(container, TWEEN_FAST, {Size = UDim2.new(1, 0, 0, 24)}):Play()
+            TweenService:Create(listFrame, TWEEN_FAST, {Size = UDim2.new(1, 0, 0, 0)}):Play()
+        end
+    end)
+end
 
     local function filterAndResize()
         local q = searchBox.Text:lower()
