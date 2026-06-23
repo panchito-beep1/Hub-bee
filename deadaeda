@@ -33,25 +33,27 @@ local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ── Theme (ImGui × Lavender Fog) ──────────────────────────────────────────────
 local Theme = {
-    WindowBg      = Color3.fromRGB(20, 20, 20),
-    TitleBg       = Color3.fromRGB(28, 28, 28),
-    Border        = Color3.fromRGB(55, 55, 55),
-    Text          = Color3.fromRGB(240, 240, 240),
-    SubText       = Color3.fromRGB(160, 160, 160),
+WindowBg      = Color3.fromRGB(45, 45, 48),
+TitleBg       = Color3.fromRGB(60, 60, 60),
+Border        = Color3.fromRGB(90, 90, 90),
 
-    Accent        = Color3.fromRGB(165, 145, 215),
-    AccentHover   = Color3.fromRGB(185, 165, 235),
+Text          = Color3.fromRGB(220, 220, 220),
+SubText       = Color3.fromRGB(160, 160, 160),
 
-    FrameBg       = Color3.fromRGB(35, 35, 35),
-    FrameBgHover  = Color3.fromRGB(45, 45, 45),
+Accent        = Color3.fromRGB(51, 153, 255),
+AccentHover   = Color3.fromRGB(80, 170, 255),
 
-    CheckOff      = Color3.fromRGB(25, 25, 25),
-    CheckOn       = Color3.fromRGB(165, 145, 215),
-    SliderTrack   = Color3.fromRGB(35, 35, 35),
-    SliderFill    = Color3.fromRGB(165, 145, 215),
+FrameBg       = Color3.fromRGB(70, 70, 70),
+FrameBgHover  = Color3.fromRGB(85, 85, 85),
 
-    TabOff        = Color3.fromRGB(25, 25, 25),
-    TabOn         = Color3.fromRGB(40, 40, 40),
+CheckOff      = Color3.fromRGB(55, 55, 55),
+CheckOn       = Color3.fromRGB(51, 153, 255),
+
+SliderTrack   = Color3.fromRGB(60, 60, 60),
+SliderFill    = Color3.fromRGB(51, 153, 255),
+
+TabOff        = Color3.fromRGB(55, 55, 55),
+TabOn         = Color3.fromRGB(75, 75, 75),
 }
 
 local TWEEN_FAST = TweenInfo.new(0.1, Enum.EasingStyle.Quad)
